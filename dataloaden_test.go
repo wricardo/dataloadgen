@@ -7,27 +7,27 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mshaeon/dataloadgen"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vikstrous/dataloadgen"
 )
 
 func TestUserLoader(t *testing.T) {
 	var fetches [][]string
 	var mu sync.Mutex
-	dl := dataloadgen.NewLoader(func(keys []string) ([]*benchmarkUser, []error) {
+	dl := dataloadgen.NewLoader(func(keys []string) (map[string]*benchmarkUser, error) {
 		mu.Lock()
 		fetches = append(fetches, keys)
 		mu.Unlock()
 
-		users := make([]*benchmarkUser, len(keys))
-		errors := make([]error, len(keys))
+		users := make(map[string]*benchmarkUser, len(keys))
+		errors := make(dataloadgen.ErrorMap[int], len(keys))
 
 		for i, key := range keys {
 			if strings.HasPrefix(key, "E") {
 				errors[i] = fmt.Errorf("user not found")
 			} else {
-				users[i] = &benchmarkUser{ID: key, Name: "user " + key}
+				users[key] = &benchmarkUser{ID: key, Name: "user " + key}
 			}
 		}
 		return users, errors

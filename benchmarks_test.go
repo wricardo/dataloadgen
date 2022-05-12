@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/graph-gophers/dataloader"
+	"github.com/mshaeon/dataloadgen"
 	"github.com/vektah/dataloaden/example"
-	"github.com/vikstrous/dataloadgen"
 )
 
 // Benchmarks copied from https://github.com/vektah/dataloaden
@@ -103,9 +103,9 @@ func (k IntKey) String() string { return strconv.Itoa(int(k)) }
 func (k IntKey) Raw() interface{} { return k }
 
 func BenchmarkDataloadgen(b *testing.B) {
-	dl := dataloadgen.NewLoader(func(keys []int) ([]benchmarkUser, []error) {
-		users := make([]benchmarkUser, len(keys))
-		errors := make([]error, len(keys))
+	dl := dataloadgen.NewLoader(func(keys []int) (map[int]benchmarkUser, error) {
+		users := make(map[int]benchmarkUser, len(keys))
+		errors := make(dataloadgen.ErrorMap[int], len(keys))
 
 		for i, key := range keys {
 			if key%100 == 1 {

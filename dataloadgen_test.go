@@ -7,18 +7,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mshaeon/dataloadgen"
 	"github.com/stretchr/testify/require"
-	"github.com/vikstrous/dataloadgen"
 )
 
 func ExampleLoader() {
-	loader := dataloadgen.NewLoader(func(keys []string) (ret []int, errs []error) {
+	loader := dataloadgen.NewLoader(func(keys []string) (map[string]int, error) {
+		errs := make(dataloadgen.ErrorMap[string])
+		ret := make(map[string]int)
 		for _, key := range keys {
 			num, err := strconv.ParseInt(key, 10, 32)
-			ret = append(ret, int(num))
-			errs = append(errs, err)
+			ret[key] = int(num)
+			if err != nil {
+				errs[key] = err
+			}
 		}
-		return
+		return ret, errs
 	},
 		dataloadgen.WithBatchCapacity(1),
 		dataloadgen.WithWait(16*time.Millisecond),
@@ -34,13 +38,13 @@ func ExampleLoader() {
 func TestEdgeCases(t *testing.T) {
 	var fetches [][]int
 	var mu sync.Mutex
-	dl := dataloadgen.NewLoader(func(keys []int) ([]string, []error) {
+	dl := dataloadgen.NewLoader(func(keys []int) (map[int]string, error) {
 		mu.Lock()
 		fetches = append(fetches, keys)
 		mu.Unlock()
 
-		results := make([]string, len(keys))
-		errors := make([]error, len(keys))
+		results := make(map[int]string, len(keys))
+		errors := make(dataloadgen.ErrorMap[int])
 
 		for i, key := range keys {
 			if key%2 == 0 {

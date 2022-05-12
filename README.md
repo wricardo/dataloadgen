@@ -2,7 +2,7 @@
 
 Godoc: https://pkg.go.dev/github.com/vikstrous/dataloadgen
 
-This is a fork of https://github.com/vektah/dataloaden that uses generics
+This is a fork of github.com/vikstrous/dataloadgen that uses generics
 instead of code genation. See the docs there for the motivation and usage details.
 
 With this package you can skip the generation step! That's why it's dataload`gen` (gen stands for generics).
@@ -10,10 +10,8 @@ With this package you can skip the generation step! That's why it's dataload`gen
 To add this package as a dependency:
 
 ```
-go get github.com/vikstrous/dataloadgen
+go get github.com/mshaeon/dataloadgen
 ```
-
-See the example in the documentation: https://pkg.go.dev/github.com/vikstrous/dataloadgen
 
 This package has evolved to include some ideas from dataloader https://github.com/graph-gophers/dataloader
 

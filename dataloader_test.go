@@ -8,17 +8,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/vikstrous/dataloadgen"
+	"github.com/mshaeon/dataloadgen"
 )
 
 // copied and adapted from github.com/graph-gophers/dataloader
 func BenchmarkLoaderFromDataloader(b *testing.B) {
 	var a = &Avg{}
-	dl := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	dl := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		a.Add(len(keys))
-		results = make([]string, 0, len(keys))
+		results = make(map[string]string, 0)
 		for _, key := range keys {
-			results = append(results, key)
+			results[key] = key
 		}
 		return results, nil
 	})
@@ -482,12 +482,12 @@ func TestLoader(t *testing.T) {
 func IDLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
-	identityLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	identityLoader := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
 		for _, key := range keys {
-			results = append(results, key)
+			results[key] = key
 		}
 		return results, nil
 	}, dataloadgen.WithBatchCapacity(max))
@@ -497,12 +497,12 @@ func IDLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 func BatchOnlyLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
-	identityLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	identityLoader := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
 		for _, key := range keys {
-			results = append(results, key)
+			results[key] = key
 		}
 		return results, nil
 	}, dataloadgen.WithBatchCapacity(max)) //dataloadgen.WithClearCacheOnBatch())
@@ -511,13 +511,15 @@ func BatchOnlyLoader(max int) (*dataloadgen.Loader[string, string], *[][]string)
 func ErrorLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
-	identityLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	identityLoader := dataloadgen.NewLoader(func(keys []string) (map[string]string, error) {
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
+		results := make(map[string]string)
+		errs := make(dataloadgen.ErrorMap[string], len(keys))
 		for _, key := range keys {
-			results = append(results, key)
-			errs = append(errs, fmt.Errorf("this is a test error"))
+			results[key] = key
+			errs[key] = fmt.Errorf("this is a test error")
 		}
 		return results, errs
 	}, dataloadgen.WithBatchCapacity(max))
@@ -526,9 +528,9 @@ func ErrorLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 func OneErrorLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
-	identityLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
-		results = make([]string, max)
-		errs = make([]error, max)
+	identityLoader := dataloadgen.NewLoader(func(keys []string) (map[string]string, error) {
+		results := make(map[string]string, max)
+		errs := make(dataloadgen.ErrorMap[string], max)
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
@@ -537,8 +539,8 @@ func OneErrorLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) 
 			if i == 0 {
 				err = errors.New("always error on the first key")
 			}
-			results[i] = keys[i]
-			errs[i] = err
+			results[fmt.Sprintf("%d", i)] = keys[i]
+			errs[fmt.Sprintf("%d", i)] = err
 		}
 		return results, errs
 	}, dataloadgen.WithBatchCapacity(max))
@@ -546,7 +548,7 @@ func OneErrorLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) 
 }
 func PanicLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var loadCalls [][]string
-	panicLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	panicLoader := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		panic("Programming error")
 	}, dataloadgen.WithBatchCapacity(max)) //, withSilentLogger())
 	return panicLoader, &loadCalls
@@ -554,11 +556,11 @@ func PanicLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 func BadLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
-	identityLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	identityLoader := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
-		results = append(results, keys[0])
+		results[keys[0]] = keys[0]
 		return results, nil
 	}, dataloadgen.WithBatchCapacity(max))
 	return identityLoader, &loadCalls
@@ -568,12 +570,12 @@ func NoCacheLoader(max int) (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
 	//cache := &NoCache{}
-	identityLoader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	identityLoader := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
 		for _, key := range keys {
-			results = append(results, key)
+			results[key] = key
 		}
 		return results, nil
 	}, /*dataloadgen.WithCache(cache),*/ dataloadgen.WithBatchCapacity(max))
@@ -585,7 +587,7 @@ func FaultyLoader() (*dataloadgen.Loader[string, string], *[][]string) {
 	var mu sync.Mutex
 	var loadCalls [][]string
 
-	loader := dataloadgen.NewLoader(func(keys []string) (results []string, errs []error) {
+	loader := dataloadgen.NewLoader(func(keys []string) (results map[string]string, errs error) {
 		mu.Lock()
 		loadCalls = append(loadCalls, keys)
 		mu.Unlock()
@@ -596,7 +598,7 @@ func FaultyLoader() (*dataloadgen.Loader[string, string], *[][]string) {
 				break
 			}
 
-			results = append(results, key)
+			results[key] = key
 		}
 		return results, nil
 	})

@@ -1,4 +1,4 @@
-module github.com/vikstrous/dataloadgen
+module github.com/mshaeon/dataloadgen
 
 go 1.18
 

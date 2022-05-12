@@ -1,7 +1,7 @@
 package dataloadgen
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 )
@@ -25,7 +25,7 @@ func WithWait(d time.Duration) Option {
 }
 
 // NewLoader creates a new GenericLoader given a fetch, wait, and maxBatch
-func NewLoader[KeyT comparable, ValueT any](fetch func(keys []KeyT) ([]ValueT, []error), options ...Option) *Loader[KeyT, ValueT] {
+func NewLoader[KeyT comparable, ValueT any](fetch func(keys []KeyT) (map[KeyT]ValueT, error), options ...Option) *Loader[KeyT, ValueT] {
 	config := &loaderConfig{
 		wait:     16 * time.Millisecond,
 		maxBatch: 0, //unlimited
@@ -52,7 +52,7 @@ type loaderConfig struct {
 // Loader batches and caches requests
 type Loader[KeyT comparable, ValueT any] struct {
 	// this method provides the data for the loader
-	fetch func(keys []KeyT) ([]ValueT, []error)
+	fetch func(keys []KeyT) (map[KeyT]ValueT, error)
 
 	*loaderConfig
 
@@ -71,8 +71,8 @@ type Loader[KeyT comparable, ValueT any] struct {
 
 type loaderBatch[KeyT comparable, ValueT any] struct {
 	keys    []KeyT
-	data    []ValueT
-	error   []error
+	data    map[KeyT]ValueT
+	error   error
 	closing bool
 	done    chan struct{}
 }
@@ -95,28 +95,31 @@ func (l *Loader[KeyT, ValueT]) LoadThunk(key KeyT) func() (ValueT, error) {
 		l.batch = &loaderBatch[KeyT, ValueT]{done: make(chan struct{})}
 	}
 	batch := l.batch
-	pos := batch.keyIndex(l, key)
+	batch.keyIndex(l, key)
 
 	thunk := func() (ValueT, error) {
 		<-batch.done
 
 		var data ValueT
-
-		// If the batch function returned the wrong number of responses, return an error to all callers
-		if len(batch.data) != len(batch.keys) {
-			return data, fmt.Errorf("bug in loader: %d values returned for %d keys", len(batch.data), len(batch.keys))
-		}
-
-		if pos < len(batch.data) {
-			data = batch.data[pos]
-		}
+		var ok bool
 
 		var err error
-		// its convenient to be able to return a single error for everything
-		if len(batch.error) == 1 {
-			err = batch.error[0]
-		} else if batch.error != nil {
-			err = batch.error[pos]
+		if batch.error != nil {
+			var em ErrorMap[KeyT]
+			if ok := errors.As(batch.error, &em); ok {
+				if em == nil || len(em) == 0 {
+					err = nil
+				} else if specificError, ok := em[key]; ok {
+					err = specificError
+				}
+			} else {
+				err = batch.error
+			}
+		}
+
+		data, ok = batch.data[key]
+		if err == nil && !ok {
+			return data, ErrNotFound
 		}
 
 		return data, err
@@ -189,10 +192,10 @@ func (l *Loader[KeyT, ValueT]) Clear(key KeyT) {
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *loaderBatch[KeyT, ValueT]) keyIndex(l *Loader[KeyT, ValueT], key KeyT) int {
-	for i, existingKey := range b.keys {
+func (b *loaderBatch[KeyT, ValueT]) keyIndex(l *Loader[KeyT, ValueT], key KeyT) {
+	for _, existingKey := range b.keys {
 		if key == existingKey {
-			return i
+			return
 		}
 	}
 
@@ -228,5 +231,5 @@ func (b *loaderBatch[KeyT, ValueT]) keyIndex(l *Loader[KeyT, ValueT], key KeyT) 
 		}
 	}
 
-	return pos
+	return
 }
