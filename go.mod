@@ -1,9 +1,10 @@
-module github.com/mshaeon/dataloadgen
+module github.com/wricardo/dataloadgen
 
 go 1.18
 
 require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
+	github.com/mshaeon/dataloadgen v0.0.0-20220512210508-0adb57946d76
 	github.com/stretchr/testify v1.7.0
 	github.com/vektah/dataloaden v0.3.0
 )
